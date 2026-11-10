@@ -1,0 +1,10 @@
+server:
+  port: "8080"
+  host: "0.0.0.0"
+db:
+  source: jdbc
+  connection:
+    url: "jdbc:postgresql://localhost:5433/web03-db"
+    username: "postgres"
+    password: "postgres"
+    poolName: pool-1

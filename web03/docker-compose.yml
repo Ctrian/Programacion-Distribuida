@@ -1,0 +1,15 @@
+services:
+  web03:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: web03-db
+    ports:
+      - "5433:5432"
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "9090:8080"

@@ -46,3 +46,10 @@ curl -i http://localhost:8080/api/hola/Ana
 ```
 
 Se espera estado `200` y el texto `hola Ana - ...`. `web01` y `web02` utilizan el puerto 8080 en las configuraciones de ejemplo; ejecutar una práctica a la vez o configurar puertos distintos. Detener `web02` con `Ctrl+C` si se arrancó desde terminal.
+
+## Práctica 3: web03 — Helidon y PostgreSQL
+
+API de libros con Helidon SE, respuesta JSON y acceso JDBC a PostgreSQL.
+Incluye PostgreSQL y Adminer mediante Docker Compose.
+
+Consultar [la documentación de web03](web03/README.md).
