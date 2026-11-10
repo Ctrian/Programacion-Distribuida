@@ -6,6 +6,10 @@ plugins {
 group = "org.example"
 version = "1.0-SNAPSHOT"
 
+application {
+    mainClass.set("com.programacion.distribuida.web02.Web02Main")
+}
+
 repositories {
     mavenCentral()
 }

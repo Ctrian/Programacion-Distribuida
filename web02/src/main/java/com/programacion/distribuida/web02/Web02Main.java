@@ -24,5 +24,7 @@ public class Web02Main {
                 t.printStackTrace();
         return null;
         });
+
+        /* ejecutar desde terminal desde la ruta: /home/labcom/Documentos/Distribuida/prueba/web02/build/install/web02/bin */
     }
 }
