@@ -1,20 +1,37 @@
 plugins {
     id("java")
+    id("io.quarkus") version "3.40.1.1"
+    id("io.freefair.lombok") version "9.8.3"
+
 }
 
-group = "org.example"
-version = "1.0-SNAPSHOT"
+group = "com.programacion.distribuida"
+version = "unspecified"
 
 repositories {
     mavenCentral()
 }
 
+val quarkusVersion = "3.40.1.1"
+
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
 dependencies {
-    testImplementation(platform("org.junit:junit-bom:6.0.0"))
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:$quarkusVersion"))
+    //CDI
+    implementation("io.quarkus:quarkus-arc")
+    //REST
+    implementation("io.quarkus:quarkus-rest")
+    //JSON B
+    implementation("io.quarkus:quarkus-rest-jsonb")
+
 }
 
-tasks.test {
-    useJUnitPlatform()
+tasks.withType<JavaCompile> {
+    options.encoding = "UTF-8"
+    options.compilerArgs.add("-parameters")
 }
