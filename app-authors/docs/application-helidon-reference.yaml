@@ -1,0 +1,12 @@
+# Referencia heredada de otro framework: este archivo no configura Quarkus.
+# La configuración efectiva está en src/main/resources/application.properties.
+server:
+  port: "8070"
+  host: "0.0.0.0"
+db:
+  source: jdbc
+  connection:
+    url: "jdbc:postgresql://localhost:5433/books-db"
+    username: "postgres"
+    password: "postgres"
+    poolName: pool-1

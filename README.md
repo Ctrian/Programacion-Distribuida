@@ -57,16 +57,35 @@ Consultar [la documentación de web03](web03/README.md).
 
 ## Práctica 4: app-authors — Quarkus
 
-Servicio con Quarkus, CDI, Jakarta REST y JSON-B. Actualmente expone `GET /config`, que devuelve una cadena vacía; todavía no implementa operaciones de autores.
+Servicio con Quarkus, CDI, Jakarta REST, JSON-B y persistencia con Panache. Expone `GET /authors`, `GET /authors/{id}` y `GET /authors/find/{isbn}` para consultar autores. Conserva `GET /config` como ejemplo de MicroProfile Config: devuelve un cuerpo vacío y escribe los valores en consola.
 
 ```bash
-bash gradlew :app-authors:quarkusDev
+bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain
 ```
 
-Quarkus utiliza el puerto 8080 por defecto. Ejecutar una práctica a la vez o configurar puertos distintos. Consultar [la documentación de app-authors](app-authors/README.md) para compilar y ejecutar el servicio empaquetado.
+`app-authors` utiliza el puerto HTTP 8070 y PostgreSQL en `localhost:5434`. Puede ejecutarse simultáneamente con `app-books`, que utiliza el puerto HTTP 8080. Consultar [la documentación de app-authors](app-authors/README.md) para preparar la base de datos, seleccionar el JDK y ejecutar el servicio.
+
+## Práctica 5: app-books — libros e inventario con Quarkus
+
+API de consulta de libros e inventario con Java 25, Jakarta REST, JSON-B y Panache. Expone `GET /books` y `GET /books/{isbn}`. El inventario comparte el ISBN del libro como clave primaria y foránea mediante `@MapsId`.
+
+```bash
+bash gradlew :app-books:quarkusDev -Ddebug=false --console=plain
+```
+
+Consultar [la documentación de app-books](app-books/README.md) para configurar el JDK, preparar las tablas y ejecutar las dos APIs en terminales separadas. `-Ddebug=false` evita que ambos procesos intenten usar el puerto de depuración 5005.
+
+| Proceso | Puerto en el equipo |
+| --- | ---: |
+| API de autores | 8070 |
+| API de libros | 8080 |
+| PostgreSQL compartido (`books-db`) | 5434 |
+| Adminer de la práctica | 9091 |
+
+La base se inicia con `docker compose -f app-authors/docker-compose.yml up -d`. Las APIs consultan directamente la misma base; todavía no se llaman entre sí por HTTP. La inicialización de tablas nuevas se realiza primero con [autores y libros](app-authors/sql/init.sql) y después con [inventario](app-books/sql/init-inventory.sql). Los scripts no deben repetirse sobre tablas ya creadas. Las referencias detalladas están en [SQL de autores y libros](docs/sql-autores-libros.md) y [SQL de inventario](docs/sql-inventario-libros.md).
 
 ## Organización del repositorio
 
-La rama única es `main`. Integra `web01`, `web02`, `web03` y `app-authors`, y conserva el historial de las antiguas ramas `main` y `master` mediante un commit de fusión.
+La rama única es `main`. Integra `web01`, `web02`, `web03`, `app-authors` y `app-books`, y conserva el historial de las antiguas ramas `main` y `master` mediante un commit de fusión.
 
 La [documentación original de master](docs/historial/README-master.md) se conserva como referencia histórica de las prácticas y su publicación. Describe el estado del equipo y del repositorio en revisiones anteriores; para la estructura y los comandos actuales, utilizar este README y los de cada módulo. Sus rutas relativas corresponden a su ubicación original en la raíz.

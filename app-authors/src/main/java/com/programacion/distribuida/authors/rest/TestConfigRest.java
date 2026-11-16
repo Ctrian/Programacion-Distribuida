@@ -5,7 +5,6 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.ConfigProvider;
-import org.eclipse.microprofile.config.inject.ConfigProperties;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.Optional;
@@ -14,7 +13,7 @@ import java.util.Optional;
 public class TestConfigRest {
 
     @Inject
-    @ConfigProperty(name="quarkus.http.port", defaultValue = "8080")
+    @ConfigProperty(name="quarkus.http.port", defaultValue = "8070")
     Integer port;
 
     @ConfigProperty(name="app.name")
