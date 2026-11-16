@@ -53,3 +53,20 @@ API de libros con Helidon SE, respuesta JSON y acceso JDBC a PostgreSQL.
 Incluye PostgreSQL y Adminer mediante Docker Compose.
 
 Consultar [la documentación de web03](web03/README.md).
+
+
+## Práctica 4: app-authors — Quarkus
+
+Servicio con Quarkus, CDI, Jakarta REST y JSON-B. Actualmente expone `GET /config`, que devuelve una cadena vacía; todavía no implementa operaciones de autores.
+
+```bash
+bash gradlew :app-authors:quarkusDev
+```
+
+Quarkus utiliza el puerto 8080 por defecto. Ejecutar una práctica a la vez o configurar puertos distintos. Consultar [la documentación de app-authors](app-authors/README.md) para compilar y ejecutar el servicio empaquetado.
+
+## Organización del repositorio
+
+La rama única es `main`. Integra `web01`, `web02`, `web03` y `app-authors`, y conserva el historial de las antiguas ramas `main` y `master` mediante un commit de fusión.
+
+La [documentación original de master](docs/historial/README-master.md) se conserva como referencia histórica de las prácticas y su publicación. Describe el estado del equipo y del repositorio en revisiones anteriores; para la estructura y los comandos actuales, utilizar este README y los de cada módulo. Sus rutas relativas corresponden a su ubicación original en la raíz.
