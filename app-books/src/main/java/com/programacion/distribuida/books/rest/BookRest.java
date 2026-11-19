@@ -1,7 +1,7 @@
 package com.programacion.distribuida.books.rest;
 
-import com.programacion.distribuida.books.db.Book;
-import com.programacion.distribuida.books.repo.BookRepository;
+import com.programacion.distribuida.books.dtos.BookDto;
+import com.programacion.distribuida.books.service.BookService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -14,23 +14,22 @@ import java.util.List;
 @Consumes(MediaType.APPLICATION_JSON)
 public class BookRest {
 
-    final BookRepository bookRepository;
+    final BookService bookService;
 
     @Inject
-    public BookRest(BookRepository bookRepository) {
-        this.bookRepository = bookRepository;
+    public BookRest(BookService bookService) {
+        this.bookService = bookService;
     }
 
     @GET
-    public List<Book> findAll() {
-            return bookRepository.listAll();
+    public List<BookDto> findAll() {
+            return bookService.findAll();
         }
 
     @GET
     @Path("/{isbn}")
     public Response getBYId(@PathParam("isbn") String isbn) {
-
-        return bookRepository.findByIdOptional(isbn)
+        return bookService.findByIdOptional(isbn)
                 .map(Response::ok)
                 .orElse(Response.status(Response.Status.NOT_FOUND))
                 .build();
