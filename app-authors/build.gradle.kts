@@ -34,6 +34,10 @@ dependencies {
     implementation("io.quarkus:quarkus-hibernate-orm-panache")
     implementation("io.quarkus:quarkus-jdbc-postgresql")
 
+    //Control de cambios en la db
+    implementation("io.quarkus:quarkus-flyway")
+    implementation("org.flywaydb:flyway-database-postgresql:13.12.2")
+
 }
 
 tasks.withType<JavaCompile> {

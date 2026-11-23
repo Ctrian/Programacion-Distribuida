@@ -59,21 +59,32 @@ Consultar [la documentación de web03](web03/README.md).
 
 Servicio con Quarkus, CDI, Jakarta REST, JSON-B y persistencia con Panache. Expone `GET /authors`, `GET /authors/{id}` y `GET /authors/find/{isbn}` para consultar autores. Conserva `GET /config` como ejemplo de MicroProfile Config: devuelve un cuerpo vacío y escribe los valores en consola.
 
+`app-authors` aplica con Flyway las migraciones de la base compartida al arrancar. La guía explica cómo consultar el historial, incorporar cambios y adoptar una base inicializada manualmente. [Guía de app-authors](app-authors/README.md#migraciones-de-la-base-compartida)
+
+## Práctica 5: app-books — libros e inventario con Quarkus
+
+API de consulta de libros e inventario con Java 25, Jakarta REST, JSON-B y Panache. Expone `GET /books` y `GET /books/{isbn}`. El detalle obtiene los autores por HTTP consultando `GET /authors/find/{isbn}` en `app-authors`. El inventario comparte el ISBN del libro como clave primaria y foránea mediante `@MapsId`. [Guía de app-books](app-books/README.md)
+
+### Arrancar autores y libros
+
+Desde la raíz del repositorio, con JDK 25 y Docker Compose, iniciar PostgreSQL y comprobar que acepte conexiones.
+
+```bash
+docker compose -f app-authors/docker-compose.yml up -d
+docker compose -f app-authors/docker-compose.yml exec -T authors pg_isready -U postgres -d books-db
+```
+
+Iniciar `app-authors` para que Flyway prepare `books-db`. Si la base ya incluye tablas creadas manualmente, comprobar su versión de partida antes de arrancar. [Base inicializada manualmente](app-authors/README.md#base-inicializada-manualmente)
+
 ```bash
 bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain
 ```
 
-`app-authors` utiliza el puerto HTTP 8070 y PostgreSQL en `localhost:5434`. Puede ejecutarse simultáneamente con `app-books`, que utiliza el puerto HTTP 8080. Consultar [la documentación de app-authors](app-authors/README.md) para preparar la base de datos, seleccionar el JDK y ejecutar el servicio.
-
-## Práctica 5: app-books — libros e inventario con Quarkus
-
-API de consulta de libros e inventario con Java 25, Jakarta REST, JSON-B y Panache. Expone `GET /books` y `GET /books/{isbn}`. El inventario comparte el ISBN del libro como clave primaria y foránea mediante `@MapsId`.
+Una vez que `app-authors` esté listo, iniciar `app-books` en otra terminal. `-Ddebug=false` evita que ambos procesos intenten usar el puerto de depuración 5005.
 
 ```bash
 bash gradlew :app-books:quarkusDev -Ddebug=false --console=plain
 ```
-
-Consultar [la documentación de app-books](app-books/README.md) para configurar el JDK, preparar las tablas y ejecutar las dos APIs en terminales separadas. `-Ddebug=false` evita que ambos procesos intenten usar el puerto de depuración 5005.
 
 | Proceso | Puerto en el equipo |
 | --- | ---: |
@@ -82,7 +93,13 @@ Consultar [la documentación de app-books](app-books/README.md) para configurar 
 | PostgreSQL compartido (`books-db`) | 5434 |
 | Adminer de la práctica | 9091 |
 
-La base se inicia con `docker compose -f app-authors/docker-compose.yml up -d`. Las APIs consultan directamente la misma base; todavía no se llaman entre sí por HTTP. La inicialización de tablas nuevas se realiza primero con [autores y libros](app-authors/sql/init.sql) y después con [inventario](app-books/sql/init-inventory.sql). Los scripts no deben repetirse sobre tablas ya creadas. Las referencias detalladas están en [SQL de autores y libros](docs/sql-autores-libros.md) y [SQL de inventario](docs/sql-inventario-libros.md).
+Para una base nueva, el arranque de `app-authors` basta para cargar las tablas y los datos de ejemplo. El diseño de las tablas y las consultas de comprobación están en las referencias de [autores y libros](docs/sql-autores-libros.md) e [inventario](docs/sql-inventario-libros.md).
+
+## Estado del proyecto
+
+- `web01`, `web02` y `web03` se pueden ejecutar como prácticas independientes.
+- `app-authors` y `app-books` comparten PostgreSQL. El esquema y la carga inicial están versionados en Flyway hasta `1.0.3`. En una base temporal con PostgreSQL 18.6 se verificó que las tres migraciones reproducen el esquema y los datos de los scripts manuales y que una segunda ejecución omite las versiones aplicadas.
+- `app-books` devuelve los autores en `GET /books/{isbn}`. El listado `GET /books` consulta el servicio de autores por cada libro y aún omite los autores en la respuesta. Las dos API ofrecen consultas de lectura.
 
 ## Organización del repositorio
 

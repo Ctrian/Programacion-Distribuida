@@ -1,12 +1,12 @@
 # SQL de referencia: autores, libros y sus relaciones
 
-Este documento conserva el SQL proporcionado para PostgreSQL, explica los problemas encontrados y propone una versión completa para una base de práctica nueva. Se puede consultar desde cualquier editor, sin las herramientas de base de datos de IntelliJ IDEA Ultimate.
+Flyway crea y carga estas tablas al arrancar `app-authors`. `V1.0.1` prepara `authors`, y `V1.0.2` añade `books` y `books_authors`. [Migración de autores](../app-authors/src/main/resources/db/migration/V1.0.1__crear-tablas-autores.sql) · [Migración de libros y relaciones](../app-authors/src/main/resources/db/migration/V1.0.2__crear-tabla-libros.sql) · [Guía de migraciones](../app-authors/README.md#migraciones-de-la-base-compartida)
 
-El SQL original se conserva como referencia de la revisión. La propuesta completa también está disponible en [app-authors/sql/init.sql](../app-authors/sql/init.sql) y se utilizó para preparar una base local de práctica. Leer este archivo no modifica tablas ni datos; la inicialización requiere ejecutar el script explícitamente y solo sobre tablas nuevas. La revisión contrasta las sentencias con la documentación de PostgreSQL y con las entidades Java presentes en `app-authors`.
+El SQL original y la inicialización manual se conservan como referencia para comparar el esquema y entender las correcciones. La carga de referencia está en [app-authors/sql/init.sql](../app-authors/sql/init.sql).
 
 ## SQL original recibido
 
-Se conserva tal como fue proporcionado, incluido el orden de las operaciones y la ausencia de punto y coma en los dos `CREATE TABLE`. **Este bloque sirve de registro; para preparar una base nueva, usar la propuesta posterior.**
+Se conserva tal como fue proporcionado, incluido el orden de las operaciones y la ausencia de punto y coma en los dos `CREATE TABLE`. Para preparar la base de la práctica, seguir el arranque con Flyway. [Guía de app-authors](../app-authors/README.md#puertos-y-arranque-paso-a-paso)
 
 ```sql
 CREATE TABLE public.authors (
@@ -91,13 +91,13 @@ INSERT INTO public.books (price, version, isbn, title) OVERRIDING SYSTEM VALUE
 
 Los cinco precios caben en `numeric(8,2)`. Los cinco ISBN usados por las doce relaciones aparecen en las inserciones de libros y no hay parejas autor–ISBN repetidas. Esto verifica la coherencia interna de los datos; no comprueba que cada ISBN corresponda al título indicado ni que las relaciones representen las autorías reales.
 
-## Propuesta completa para una base nueva
+## SQL de inicialización manual de referencia
 
 Esta propuesta mantiene `bigint`, los nombres de columnas y los datos de libros y relaciones del SQL recibido. Añade PK, FK, generación de IDs y un valor predeterminado de `1` para `version`.
 
 **Los nombres `Autor de ejemplo 1` a `Autor de ejemplo 5` son marcadores de práctica añadidos para completar la carga. Sustituirlos por los nombres correctos antes de usar datos reales.**
 
-Ejecutar una sola vez en una base de práctica donde estas tres tablas todavía no existan. No es una migración de tablas existentes ni un script para ejecutar repetidamente: fallará si las tablas ya están creadas. No contiene `DROP`, `TRUNCATE` ni borrados.
+Este bloque corresponde al flujo manual anterior y requiere una base donde estas tres tablas aún no existan. Para preparar `books-db` con los servicios actuales, usar las migraciones de Flyway.
 
 ```sql
 BEGIN;
@@ -173,7 +173,7 @@ La PK compuesta evita repetir una pareja autor–ISBN. Las FK impiden insertar r
 
 ## Diferencias detectadas en la revisión inicial
 
-La siguiente tabla conserva los hallazgos de la revisión inicial. Las clases actuales de `app-authors` ya alinean `books_authors`, `authors_id`, IDs `Long`, igualdad de la clave compuesta y la consulta `o.id.booksIsbn`. La columna `version` continúa sin mapearse en Java; el SQL usa `DEFAULT 1`. La propuesta completa también está disponible como `app-authors/sql/init.sql` para inicializar una base nueva.
+La siguiente tabla conserva los hallazgos de la revisión inicial. Las clases actuales de `app-authors` ya alinean `books_authors`, `authors_id`, IDs `Long`, igualdad de la clave compuesta y la consulta `o.id.booksIsbn`. La columna `version` usa `DEFAULT 1` y permanece fuera del mapeo Java.
 
 | Archivo | Diferencia observada |
 | --- | --- |
@@ -186,7 +186,7 @@ La siguiente tabla conserva los hallazgos de la revisión inicial. Las clases ac
 
 ## Consultas para comprobar los datos
 
-Después de ejecutar correctamente la propuesta sobre tablas nuevas, se esperan 5 autores, 5 libros y 12 relaciones:
+Después de aplicar las migraciones en una base nueva, se esperan 5 autores, 5 libros y 12 relaciones:
 
 ```sql
 SELECT 'authors' AS tabla, COUNT(*) AS filas FROM public.authors
@@ -210,7 +210,7 @@ ORDER BY a.id;
 -- Resultado esperado para esta carga: IDs 1, 2, 4 y 5.
 ```
 
-Se pueden copiar los bloques a un cliente PostgreSQL como `psql`. Si se guarda únicamente el bloque de creación y carga en un archivo `.sql`, se puede ejecutar con `psql -X -v ON_ERROR_STOP=1 -h HOST -p PUERTO -U USUARIO -d BASE -f archivo.sql`, sustituyendo los parámetros por los de la conexión. El archivo Markdown completo no debe pasarse a `psql`.
+Las consultas de comprobación se pueden ejecutar en Adminer o `psql`, conectados a la base que migró `app-authors`.
 
 ## Referencias de PostgreSQL
 

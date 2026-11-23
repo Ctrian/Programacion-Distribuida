@@ -2,7 +2,7 @@
 
 `app-books` expone consultas de libros mediante Jakarta REST, JSON-B y Hibernate ORM con Panache. Usa Java 25, Quarkus `3.40.1.1`, Lombok `9.8.3` y el wrapper Gradle `9.8.2` compartido con los demás módulos del repositorio.
 
-La API escucha en **8080**. `app-authors` escucha en **8070**. En esta práctica ambos servicios acceden a la misma base PostgreSQL `books-db`, publicada en **5434** por el Compose de `app-authors`. No hay todavía llamadas HTTP entre ambos servicios: cada repositorio consulta directamente la base.
+La API escucha en **8080**. Ambos servicios acceden a la base PostgreSQL `books-db`, publicada en **5434** por el Compose de `app-authors`. `app-books` lee los libros y el inventario desde PostgreSQL y consulta los autores por HTTP en `app-authors`, que escucha en **8070**.
 
 ## Estructura y dependencias
 
@@ -14,17 +14,21 @@ app-books/
 └── src/main/
     ├── java/
     │   ├── com/programacion/distribuida/books/
+    │   │   ├── clients/AuthorRestClient.java
+    │   │   ├── config/RestClientConfig.java
     │   │   ├── db/Book.java
     │   │   ├── db/Inventory.java
+    │   │   ├── dtos/{AuthorDto,BookDto}.java
     │   │   ├── repo/BookRepository.java
-    │   │   └── rest/BookRest.java
+    │   │   ├── rest/BookRest.java
+    │   │   └── service/{BookService.java,impl/BookServiceImpl.java}
     │   └── org/example/Main.java
     └── resources/
         ├── application.properties
         └── META-INF/microprofile-config.properties
 ```
 
-[build.gradle.kts](build.gradle.kts) declara el plugin Quarkus y su BOM, CDI (`quarkus-arc`), Jakarta REST (`quarkus-rest`), JSON-B (`quarkus-rest-jsonb`), Hibernate ORM, Panache y el driver JDBC de PostgreSQL. Compila con UTF-8 y `-parameters`. Lombok genera getters, setters y métodos `toString()` de las entidades.
+[build.gradle.kts](build.gradle.kts) declara el plugin Quarkus y su BOM, CDI (`quarkus-arc`), Jakarta REST (`quarkus-rest`), JSON-B (`quarkus-rest-jsonb`), Hibernate ORM, Panache y el driver JDBC de PostgreSQL. `quarkus-rest-client` y `quarkus-rest-client-jsonb` aportan el cliente HTTP y el mapeo JSON de los autores. La compilación usa UTF-8 y `-parameters`. Lombok genera getters, setters y métodos `toString()` de las entidades.
 
 La clase `org.example.Main` es un ejemplo de consola del IDE; no inicia la API. Quarkus arranca mediante la tarea `quarkusDev` o el JAR empaquetado.
 
@@ -35,18 +39,22 @@ La clase `org.example.Main` es un ejemplo de consola del IDE; no inicia la API. 
 | [Book](src/main/java/com/programacion/distribuida/books/db/Book.java) | Mapea `books`: ISBN como ID `String`, título, precio `BigDecimal` y relación uno a uno con inventario. |
 | [Inventory](src/main/java/com/programacion/distribuida/books/db/Inventory.java) | Mapea `inventory`: ISBN, unidades vendidas (`sold`) y suministradas (`supplied`). |
 | [BookRepository](src/main/java/com/programacion/distribuida/books/repo/BookRepository.java) | Repositorio CDI transaccional que implementa `PanacheRepositoryBase<Book, String>`. |
-| [BookRest](src/main/java/com/programacion/distribuida/books/rest/BookRest.java) | Recibe el repositorio por constructor y publica las consultas como JSON. |
+| [AuthorRestClient](src/main/java/com/programacion/distribuida/books/clients/AuthorRestClient.java) | Cliente MicroProfile REST para `GET /authors/find/{isbn}`. |
+| [BookServiceImpl](src/main/java/com/programacion/distribuida/books/service/impl/BookServiceImpl.java) | Consulta el repositorio, construye el `BookDto` y agrega los autores al detalle del libro. |
+| [BookRest](src/main/java/com/programacion/distribuida/books/rest/BookRest.java) | Delega las consultas al servicio y devuelve los DTO como JSON. |
 
 `Inventory.bookIsbn` mapea `book_isbn`, que es clave primaria y referencia al libro. `@MapsId` hace que la asociación `Inventory.book` comparta ese identificador. En `Book`, `@OneToOne(mappedBy = "book")` declara el lado inverso de la asociación.
 
-`@JsonbTransient` excluye la referencia `Inventory.book` de JSON para evitar la recursión libro → inventario → libro. `@ToString.Exclude` evita recorrer las referencias de la relación al imprimir las entidades.
-
 | Endpoint | Resultado |
 | --- | --- |
-| `GET /books` | Lista de libros JSON; `[]` si no hay libros. |
-| `GET /books/{isbn}` | Libro JSON con estado 200; estado 404 si el ISBN no existe. |
+| `GET /books` | Lista JSON de libros con sus cantidades de inventario, o `[]` si la tabla está vacía. |
+| `GET /books/{isbn}` | Devuelve 200 con el libro, las cantidades de inventario y `authors`. Devuelve 404 para un ISBN ausente si la consulta a autores se completa. |
 
-Un libro sin registro de inventario puede devolver `inventory: null`. No hay endpoints de creación, modificación o eliminación de libros o inventario. La columna SQL `version` no está mapeada con `@Version`; actualmente no hay control de concurrencia optimista mediante esa columna.
+Los dos endpoints devuelven `inventorySold` (unidades vendidas) e `inventorySupplied` (unidades suministradas) en el JSON del libro. Cuando falta la fila de `inventory`, los dos campos valen `0`. Las existencias disponibles se calculan restando `inventorySold` de `inventorySupplied`. Con los datos de ejemplo, *Effective Java* tiene 50 unidades suministradas, 10 vendidas y 40 disponibles.
+
+En el código actual, el listado consulta autores por cada libro y descarta esas respuestas, por lo que `authors` se rellena únicamente en el detalle. El detalle llama a `app-authors` incluso antes de comprobar si el ISBN existe. Si falla la llamada HTTP, la consulta de libros que la hizo también puede fallar.
+
+Para distinguir un libro sin inventario registrado de uno con cantidades en cero, consulta la fila por `book_isbn` en PostgreSQL. Usa las [consultas SQL de inventario](../docs/sql-inventario-libros.md#consultas-para-comprobar-la-carga). La API de libros ofrece consultas de lectura y la columna `version` existe en SQL sin un mapeo `@Version` en Java.
 
 ## Configuración
 
@@ -65,11 +73,18 @@ quarkus.datasource.devservices.enabled=false
 quarkus.hibernate-orm.schema-management.strategy=none
 ```
 
-Dev Services está desactivado porque PostgreSQL se inicia explícitamente con Docker Compose. Hibernate no crea ni borra tablas: el esquema se prepara mediante SQL. En desarrollo puede informar diferencias del esquema mediante su comprobación en segundo plano.
+Dev Services está desactivado porque PostgreSQL se inicia explícitamente con Docker Compose. `app-books` usa el esquema que Flyway prepara al arrancar `app-authors`. En desarrollo, Hibernate puede informar diferencias del esquema mediante su comprobación en segundo plano. [Migraciones de la base compartida](../app-authors/README.md#migraciones-de-la-base-compartida)
 
 Las credenciales son valores de práctica local. Para otra conexión se pueden usar `QUARKUS_DATASOURCE_JDBC_URL`, `QUARKUS_DATASOURCE_USERNAME` y `QUARKUS_DATASOURCE_PASSWORD`; esas variables tienen prioridad sobre el archivo.
 
-[microprofile-config.properties](src/main/resources/META-INF/microprofile-config.properties) define `app.name=App Books`. Las clases actuales no consultan esa propiedad y este módulo no expone `/config`.
+El cliente registrado con `@RegisterRestClient(configKey = "AuthorRestClient")` obtiene su URL base de estas propiedades de [microprofile-config.properties](src/main/resources/META-INF/microprofile-config.properties):
+
+```properties
+app.authors.url=http://localhost:8070
+AuthorRestClient/mp-rest/url=${app.authors.url}
+```
+
+Para usar otra instancia de autores, definir `APP_AUTHORS_URL` en el entorno de `app-books`. El valor es la URL base del servicio. `AuthorRestClient` añade la ruta `/authors/find/{isbn}`.
 
 ## Arranque paso a paso
 
@@ -96,28 +111,18 @@ Ejecutar los comandos desde la raíz del repositorio `Programacion-Distribuida`.
 
    Esperar a que PostgreSQL acepte conexiones. Se usa `5434` en el equipo para evitar el `5433` de la práctica `web03`. Adminer se publica en `http://localhost:9091`; su puerto interno 8080 no ocupa el puerto HTTP de libros.
 
-3. Preparar el esquema **solo si las tablas todavía no existen**:
+3. Iniciar autores para que Flyway prepare la base compartida y para que el cliente HTTP tenga un servicio disponible.
 
-   ```bash
-   # Solo si no existen authors, books ni books_authors.
-   docker compose -f app-authors/docker-compose.yml exec -T authors psql -X -v ON_ERROR_STOP=1 -U postgres -d books-db < app-authors/sql/init.sql
-
-   # Después, solo si no existe inventory.
-   docker compose -f app-authors/docker-compose.yml exec -T authors psql -X -v ON_ERROR_STOP=1 -U postgres -d books-db < app-books/sql/init-inventory.sql
-   ```
-
-   El primer script crea y carga autores, libros y relaciones. El segundo crea inventario y carga un registro con ISBN `978-0134686097`, `sold=10` y `supplied=50`. Son inicializaciones para tablas nuevas, no migraciones ni comandos para repetir en cada arranque. No contienen borrados. Si las tablas ya existen, conservarlas y comprobar su estructura con las [referencias SQL de autores y libros](../docs/sql-autores-libros.md) y [de inventario](../docs/sql-inventario-libros.md).
-
-4. Iniciar libros y mantener la terminal abierta:
-
-   ```bash
-   bash gradlew :app-books:quarkusDev -Ddebug=false --console=plain
-   ```
-
-   Para ejecutar autores al mismo tiempo, abrir otra terminal con el mismo JDK:
+   Si la base ya fue preparada con los scripts manuales, revisar su versión de partida antes de arrancar. [Base inicializada manualmente](../app-authors/README.md#base-inicializada-manualmente)
 
    ```bash
    bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain
+   ```
+
+4. Cuando `app-authors` esté listo, abrir otra terminal con el mismo JDK e iniciar libros.
+
+   ```bash
+   bash gradlew :app-books:quarkusDev -Ddebug=false --console=plain
    ```
 
    `-Ddebug=false` desactiva el depurador para evitar que ambos procesos ocupen el puerto 5005 predeterminado. Los puertos HTTP siguen siendo 8080 y 8070. Véase la [guía de Quarkus con Gradle](https://quarkus.io/guides/gradle-tooling/).
@@ -131,7 +136,7 @@ Ejecutar los comandos desde la raíz del repositorio `Programacion-Distribuida`.
    curl -i http://localhost:8070/authors/find/978-0134686097
    ```
 
-   Con la carga de ejemplo, el listado contiene cinco libros. El libro `978-0134686097` incluye el inventario cargado y el ISBN inexistente devuelve 404. La consulta en 8070 permite comprobar sus autores mediante la API del otro módulo. Son comprobaciones manuales; `app-books` no contiene pruebas automatizadas propias en `src/test`.
+   Con la carga de ejemplo, el listado contiene cinco libros. Para `978-0134686097`, el detalle devuelve `inventorySold: 10`, `inventorySupplied: 50` y los autores con IDs `1` y `5`. La consulta directa en `8070` devuelve esos mismos autores. Con `app-authors` disponible, el ISBN inexistente devuelve 404.
 
 6. Detener cada API con `Ctrl+C`. Detener los contenedores cuando ninguno de los dos servicios necesite la base:
 
@@ -145,7 +150,18 @@ El Compose actual no declara un volumen con nombre. Conservar los contenedores y
 
 ```bash
 bash gradlew :app-authors:quarkusBuild :app-books:quarkusBuild
+```
+
+Con PostgreSQL disponible, ejecutar primero el JAR de autores para aplicar las migraciones pendientes:
+
+```bash
+java -jar app-authors/build/quarkus-app/quarkus-run.jar
+```
+
+Cuando autores esté listo, ejecutar el JAR de libros en otra terminal:
+
+```bash
 java -jar app-books/build/quarkus-app/quarkus-run.jar
 ```
 
-PostgreSQL y las tablas deben estar preparados antes de consultar la API. Para distribuir el servicio, copiar toda la carpeta `app-books/build/quarkus-app/`, no solamente `quarkus-run.jar`.
+Para distribuir cada servicio, copiar su carpeta `build/quarkus-app/` completa con el JAR y sus dependencias. Configurar la conexión a PostgreSQL en ambos servicios y la URL de autores en `app-books` según el entorno de despliegue.

@@ -1,8 +1,8 @@
 # SQL de referencia: inventario de app-books
 
-Este documento registra el SQL de inventario de `app-books`, explica las mejoras propuestas y permite consultarlo sin IntelliJ IDEA Ultimate. Complementa [el SQL de autores y libros](sql-autores-libros.md).
+Flyway crea y carga `inventory` al arrancar `app-authors`. La versión `1.0.3` depende de `1.0.2`, que crea `books` y carga el ISBN de ejemplo. [Migración de inventario](../app-authors/src/main/resources/db/migration/V1.0.3__crear-tablas-inventory.sql) · [Guía de migraciones](../app-authors/README.md#migraciones-de-la-base-compartida)
 
-Este documento describe el SQL y su correspondencia con las entidades actuales. Leerlo no modifica la base de datos. El bloque propuesto se conserva también como [script de inicialización](../app-books/sql/init-inventory.sql); su ejecución es manual y está destinada a una tabla nueva.
+El documento conserva el SQL original, explica las restricciones y muestra cómo comprobar la carga. El [script de inicialización manual](../app-books/sql/init-inventory.sql) queda como referencia junto con el [SQL de autores y libros](sql-autores-libros.md).
 
 ## SQL original recibido
 
@@ -45,13 +45,15 @@ Si `supplied` y `sold` representan acumulados del mismo inventario, las existenc
 
 Las PK, FK y condiciones `CHECK` son mejoras de integridad respecto al SQL original; no son necesarias para que la sintaxis original sea válida. Véase la [documentación de restricciones de PostgreSQL](https://www.postgresql.org/docs/current/ddl-constraints.html).
 
-## SQL propuesto
+## SQL de inicialización manual de referencia
 
-Requisitos antes de ejecutar:
+El bloque histórico se ejecutaba tras la carga manual de libros y exigía estas condiciones:
 
-- Debe existir `public.books` en la misma base de datos, con `isbn` de tipo `varchar(255)` y una clave primaria o restricción única sobre esa columna. La propuesta de [sql-autores-libros.md](sql-autores-libros.md) ya incluye esa PK.
-- Debe existir el libro con ISBN `978-0134686097` antes del `INSERT`. La carga del documento anterior ya lo incluye.
-- `public.inventory` todavía no debe existir. Este bloque crea una tabla nueva; no migra una tabla existente ni está diseñado para repetirse.
+- `public.books` existe en la misma base y `isbn` es una clave primaria o única de tipo `varchar(255)`.
+- El libro con ISBN `978-0134686097` existe antes del `INSERT`.
+- `public.inventory` se crea por primera vez.
+
+En el flujo actual, Flyway ejecuta `V1.0.3` después de `V1.0.2` y abre y cierra la transacción de la migración.
 
 ```sql
 BEGIN;
@@ -79,12 +81,12 @@ Se conservan exactamente los cuatro valores recibidos. Los valores predeterminad
 
 ## Correspondencia con las entidades Java
 
-- [Inventory.java](../app-books/src/main/java/com/programacion/distribuida/books/db/Inventory.java) declara `@Table(name = "inventory")`, el ID `String bookIsbn` con `@Column(name = "book_isbn")` y la asociación `book` con `@MapsId`, `@OneToOne` y `@JoinColumn(name = "book_isbn")`. La propuesta SQL representa esa identidad mediante `book_isbn`, que es simultáneamente PK y FK.
+- `Inventory` declara `@Table(name = "inventory")`, el ID `String bookIsbn` con `@Column(name = "book_isbn")` y la asociación `book` con `@MapsId`, `@OneToOne` y `@JoinColumn(name = "book_isbn")`. El SQL representa esa identidad mediante `book_isbn`, que es simultáneamente PK y FK. [Inventory.java](../app-books/src/main/java/com/programacion/distribuida/books/db/Inventory.java)
 - Los campos `sold` y `supplied` son `Integer`, coherentes con `integer` de PostgreSQL.
 - `Inventory` no declara un campo `version` ni `@Version`. El `DEFAULT 1` permite insertar desde Java sin proporcionar esa columna, pero no implementa control de concurrencia optimista. Si se quiere ese control, habrá que mapear la columna con `@Version`.
-- [Book.java](../app-books/src/main/java/com/programacion/distribuida/books/db/Book.java) declara `isbn` como `String` con `@Id`, coherente con la referencia SQL. Su campo `inventory` ya declara `@OneToOne(mappedBy = "book")`, que corresponde al lado inverso de la relación. `@JsonbTransient` sobre `Inventory.book` evita la recursión en la respuesta JSON.
+- `Book` declara `isbn` como `String` con `@Id` e `inventory` con `@OneToOne(mappedBy = "book")` para el lado inverso de la relación. La API expone las cantidades como `inventorySold` e `inventorySupplied` mediante `BookDto`. [Book.java](../app-books/src/main/java/com/programacion/distribuida/books/db/Book.java) · [BookDto.java](../app-books/src/main/java/com/programacion/distribuida/books/dtos/BookDto.java)
 
-Las clases implementan consultas de libros; todavía no existen endpoints de escritura de inventario. Los resultados SQL que siguen son los esperados al ejecutar la carga propuesta.
+La API ofrece consultas de lectura. Los resultados SQL que siguen corresponden a los datos cargados por `V1.0.3` en una base nueva.
 
 ## Consultas para comprobar la carga
 
@@ -109,4 +111,4 @@ JOIN public.inventory AS i ON i.book_isbn = b.isbn
 WHERE b.isbn = '978-0134686097';
 ```
 
-Los bloques SQL se pueden ejecutar desde un cliente como `psql`; el archivo Markdown completo no es un script SQL. Si se guarda únicamente el bloque propuesto en `inventory.sql`, puede ejecutarse con `psql -X -v ON_ERROR_STOP=1 -h HOST -p PUERTO -U USUARIO -d BASE -f inventory.sql`, reemplazando los parámetros de conexión.
+Las consultas de comprobación se pueden ejecutar en Adminer o `psql`, conectados a la base que migró `app-authors`.

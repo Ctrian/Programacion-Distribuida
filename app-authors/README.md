@@ -2,7 +2,7 @@
 
 `app-authors` es un módulo del proyecto Gradle `Programacion-Distribuida`. Expone una API de consulta de autores con Jakarta REST y Panache, además de un endpoint de práctica que lee propiedades mediante MicroProfile Config y muestra los resultados en la consola del servidor.
 
-Contiene las entidades `Author`, `BookAuthor` y `BookAuthorId`, el repositorio `AuthorRepository` y el recurso `AuthorRest`. Actualmente implementa consultas; no incluye endpoints para crear, modificar o eliminar autores. PostgreSQL guarda los datos y debe estar disponible antes de iniciar el servicio.
+Contiene las entidades `Author`, `BookAuthor` y `BookAuthorId`, el repositorio `AuthorRepository` y el recurso `AuthorRest`. La API ofrece consultas de lectura. El módulo aplica las migraciones de Flyway sobre la base PostgreSQL que comparte con `app-books`.
 
 ## Puertos y arranque paso a paso
 
@@ -34,21 +34,17 @@ Ejecutar desde la raíz `Programacion-Distribuida`:
    docker compose -f app-authors/docker-compose.yml exec -T authors pg_isready -U postgres -d books-db
    ```
 
-3. Solo en una base nueva, sin las tablas `authors`, `books` y `books_authors`, cargar el SQL de práctica:
+3. Cuando PostgreSQL acepte conexiones, iniciar el servicio de autores y mantener esta terminal abierta:
 
-   ```bash
-   docker compose -f app-authors/docker-compose.yml exec -T authors psql -X -v ON_ERROR_STOP=1 -U postgres -d books-db < app-authors/sql/init.sql
-   ```
-
-   El script crea tres tablas y carga cinco autores de ejemplo, cinco libros y doce relaciones. No ejecutarlo sobre una base ya preparada: es una inicialización, no una migración. Se conserva el detalle en [la referencia SQL](../docs/sql-autores-libros.md).
-
-4. Iniciar únicamente el servicio de autores y mantener esta terminal abierta:
+   Si la base ya fue preparada con los scripts manuales, consultar cómo incorporarla a Flyway antes de arrancar. [Base inicializada manualmente](#base-inicializada-manualmente)
 
    ```bash
    bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain
    ```
 
-5. Desde otra terminal, comprobar las consultas:
+   En una base nueva, Flyway crea `authors`, `books`, `books_authors` e `inventory` y carga los datos de ejemplo. [Migraciones de la base compartida](#migraciones-de-la-base-compartida)
+
+4. Desde otra terminal, comprobar las consultas:
 
    ```bash
    curl -i http://localhost:8070/authors
@@ -59,7 +55,7 @@ Ejecutar desde la raíz `Programacion-Distribuida`:
 
    Con la carga de ejemplo se esperan cinco autores en la primera consulta y los autores con IDs 1, 2, 4 y 5 en la consulta por ISBN. `/config` devuelve un cuerpo vacío y escribe sus resultados en la consola. Un ID inexistente devuelve 404.
 
-6. Para detener la API, pulsar `Ctrl+C`. Para detener los contenedores conservándolos:
+5. Para detener la API, pulsar `Ctrl+C`. Para detener los contenedores conservándolos:
 
    ```bash
    docker compose -f app-authors/docker-compose.yml stop
@@ -67,7 +63,7 @@ Ejecutar desde la raíz `Programacion-Distribuida`:
 
 Para entrar a Adminer, abrir `http://localhost:9091`, seleccionar PostgreSQL y usar servidor `authors`, usuario `postgres`, contraseña `postgres` y base `books-db`. Dentro de Docker se usa el nombre del servicio, no `localhost:5434`. El Compose actual no declara un volumen con nombre: conservar los contenedores y hacer una copia antes de eliminarlos o recrearlos si los datos importan.
 
-Para ejecutar libros simultáneamente en otra terminal, usar `bash gradlew :app-books:quarkusDev -Ddebug=false --console=plain`. La opción `-Ddebug=false` evita el conflicto del puerto de depuración 5005 entre las dos APIs. Ambos servicios comparten `books-db`; detener PostgreSQL afecta a los dos. El esquema de inventario y sus pasos de preparación están en el [README de app-books](../app-books/README.md). Actualmente no hay llamadas HTTP entre los servicios.
+Cuando `app-authors` esté listo, abrir otra terminal y ejecutar `bash gradlew :app-books:quarkusDev -Ddebug=false --console=plain`. La opción `-Ddebug=false` evita el conflicto del puerto de depuración 5005. `app-books` usa `GET /authors/find/{isbn}` para consultar autores por HTTP. [README de app-books](../app-books/README.md)
 
 ## API y persistencia de autores
 
@@ -104,8 +100,10 @@ Las dependencias principales son:
 | `quarkus-hibernate-orm` | Persistencia mediante JPA/Hibernate ORM. |
 | `quarkus-hibernate-orm-panache` | Facilidades de Panache para entidades y repositorios. |
 | `quarkus-jdbc-postgresql` | Driver e integración JDBC para PostgreSQL. |
+| `quarkus-flyway` | Integración de Flyway con el arranque de Quarkus. |
+| `flyway-database-postgresql` | Soporte de PostgreSQL para Flyway. |
 
-Las dependencias se resuelven desde Maven Central. Hibernate usa las entidades declaradas. La creación de tablas se hace mediante el SQL de inicialización, no automáticamente al arrancar.
+Las dependencias se resuelven desde Maven Central. Hibernate mapea las entidades y Flyway administra las tablas mediante los SQL versionados.
 
 ## Estructura del módulo
 
@@ -126,8 +124,11 @@ app-authors/
     │       └── Main.java
     └── resources/
         ├── application.properties
-        └── META-INF/
-            └── microprofile-config.properties
+        ├── META-INF/microprofile-config.properties
+        └── db/migration/
+            ├── V1.0.1__crear-tablas-autores.sql
+            ├── V1.0.2__crear-tabla-libros.sql
+            └── V1.0.3__crear-tablas-inventory.sql
 ```
 
 [TestConfigRest.java](src/main/java/com/programacion/distribuida/authors/rest/TestConfigRest.java) contiene el recurso de prueba de configuración; `AuthorRest` contiene las consultas de autores. [Main.java](src/main/java/org/example/Main.java) es un ejemplo de consola generado por el IDE: imprime un saludo y los números del 1 al 5. No es el punto de entrada del servidor Quarkus.
@@ -203,8 +204,10 @@ quarkus.datasource.jdbc.url=${AUTHORS_DB_URL:jdbc:postgresql://localhost:5434/bo
 quarkus.datasource.username=${AUTHORS_DB_USERNAME:postgres}
 quarkus.datasource.password=${AUTHORS_DB_PASSWORD:postgres}
 quarkus.datasource.devservices.enabled=false
-# El esquema se prepara con SQL; Hibernate no crea ni borra las tablas.
 quarkus.hibernate-orm.schema-management.strategy=none
+
+quarkus.flyway.migrate-at-start=true
+quarkus.flyway.baseline-on-migrate=true
 ```
 
 `quarkus.http.port` fija el puerto 8070 y `quarkus.http.host` permite escuchar en todas las interfaces. Las expresiones `${VARIABLE:valor}` permiten sobrescribir la conexión mediante variables de entorno; por defecto apuntan al PostgreSQL del Compose, en `localhost:5434/books-db`. Las credenciales predeterminadas son solo para la práctica local.
@@ -232,9 +235,49 @@ Así, `application.properties` gana frente a `microprofile-config.properties` si
 
 ## PostgreSQL y variables de entorno
 
-La base se inicia con el Compose y se prepara mediante `sql/init.sql`, como se explica en los pasos iniciales. La API puede arrancar sin las tablas porque no exige la validación como estrategia de arranque, pero sus consultas fallarán hasta que exista el esquema. En desarrollo, Hibernate también puede informar diferencias mediante su comprobación en segundo plano.
+Docker Compose levanta PostgreSQL. Al inicializar un directorio de datos vacío, el contenedor crea la base `books-db`. Al arrancar, `app-authors` conecta a esa base y Flyway valida y aplica las migraciones pendientes.
 
-Para usar una base diferente, definir `AUTHORS_DB_URL`, `AUTHORS_DB_USERNAME` y `AUTHORS_DB_PASSWORD`. Las variables estándar `QUARKUS_DATASOURCE_JDBC_URL`, `QUARKUS_DATASOURCE_USERNAME` y `QUARKUS_DATASOURCE_PASSWORD` también permiten sobrescribir la configuración. En producción hay que proporcionar la conexión y preparar el esquema antes de consultar.
+Para usar una base diferente, definir `AUTHORS_DB_URL`, `AUTHORS_DB_USERNAME` y `AUTHORS_DB_PASSWORD`. Las variables estándar `QUARKUS_DATASOURCE_JDBC_URL`, `QUARKUS_DATASOURCE_USERNAME` y `QUARKUS_DATASOURCE_PASSWORD` también permiten sobrescribir la conexión. El usuario de PostgreSQL necesita permisos para aplicar las migraciones pendientes y registrar su ejecución.
+
+## Migraciones de la base compartida
+
+Flyway busca los archivos `V<versión>__<descripción>.sql` en `src/main/resources/db/migration/`. La secuencia de versiones es común a autores, libros e inventario.
+
+| Versión | Cambio |
+| --- | --- |
+| [`1.0.1`](src/main/resources/db/migration/V1.0.1__crear-tablas-autores.sql) | Crea `authors`, carga cinco autores y ajusta la secuencia de IDs. |
+| [`1.0.2`](src/main/resources/db/migration/V1.0.2__crear-tabla-libros.sql) | Crea `books` y `books_authors`, carga cinco libros y doce relaciones. |
+| [`1.0.3`](src/main/resources/db/migration/V1.0.3__crear-tablas-inventory.sql) | Crea `inventory` con sus restricciones y carga el inventario de *Effective Java*. |
+
+`migrate-at-start=true` aplica las versiones pendientes al ejecutar `quarkusDev` o al arrancar el JAR empaquetado. `quarkusBuild` prepara el paquete. En este flujo se omiten los antiguos scripts de inicialización manual. Flyway registra las migraciones aplicadas en `public.flyway_schema_history` de cada base, con el nombre del archivo, su *checksum* y el resultado. Consultar la tabla desde Adminer o `psql`:
+
+```sql
+SELECT version, script, checksum, installed_on, success
+FROM public.flyway_schema_history
+ORDER BY installed_rank;
+```
+
+Para cambiar una tabla, crear un archivo con una versión posterior. Por ejemplo, `V1.0.4__agregar-email-a-autores.sql` podría contener este cambio:
+
+```sql
+ALTER TABLE public.authors ADD COLUMN email varchar(255);
+```
+
+En una base al día hasta `1.0.3`, el próximo arranque solo ejecutaría `1.0.4`. Una base nueva ejecutaría las cuatro versiones en orden. Si se modifica el contenido de un archivo ya aplicado y cambia su *checksum*, Flyway detiene el arranque con un error de validación. Restaurar el contenido aplicado y trasladar el cambio al archivo nuevo. Las migraciones pueden incluir cambios de esquema y datos de referencia explícitos en SQL. Los datos agregados durante el uso de la aplicación permanecen en su propia base.
+
+### Base inicializada manualmente
+
+Con `baseline-on-migrate=true`, una base con tablas y sin historial se marca con una versión de partida. Flyway omite las migraciones hasta esa versión inclusive. El valor predeterminado es `1`, así que usarlo con las tablas de esta práctica ya creadas haría que Flyway intentara ejecutar `1.0.1` y chocara con `authors`.
+
+Antes de adoptar esa base, comprobar qué migraciones representan su esquema y su carga inicial. Si ya corresponden a las tres versiones, usar `1.0.3` como punto de partida. Si solo corresponden a autores, libros y relaciones y falta inventario, usar `1.0.2` para que Flyway aplique `1.0.3`. Si el estado es parcial, revisar las diferencias antes de fijar el punto de partida. [Referencias SQL de autores y libros](../docs/sql-autores-libros.md) · [Inventario](../docs/sql-inventario-libros.md)
+
+Ejemplo de primer arranque para una base equivalente a `1.0.3` sin historial:
+
+```bash
+QUARKUS_FLYWAY_BASELINE_VERSION=1.0.3 bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain
+```
+
+Para los siguientes arranques, Flyway usa el historial que ya existe en la base. [Guía de Flyway en Quarkus](https://quarkus.io/guides/flyway/) · [Configuración de `baselineOnMigrate`](https://documentation.red-gate.com/flyway/reference/configuration/flyway-namespace/flyway-baseline-on-migrate-setting)
 
 ## Ejecutar y comprobar el comportamiento
 
@@ -279,7 +322,7 @@ bash gradlew :app-authors:quarkusBuild
 java -jar app-authors/build/quarkus-app/quarkus-run.jar
 ```
 
-Para trasladar la aplicación, copiar toda la carpeta `app-authors/build/quarkus-app/`, incluidas sus dependencias. Ejecutar solo el JAR aislado de esa carpeta no basta. La configuración de conexión de producción debe estar disponible al arrancar.
+Para trasladar la aplicación, copiar toda la carpeta `app-authors/build/quarkus-app/`, incluidas sus dependencias. Proporcionar la conexión a PostgreSQL al ejecutar el JAR. Flyway aplica en ese arranque las migraciones pendientes de la base configurada.
 
 ## Detalles pendientes del ejemplo
 
