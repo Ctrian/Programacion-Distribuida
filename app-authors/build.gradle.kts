@@ -38,6 +38,8 @@ dependencies {
     implementation("io.quarkus:quarkus-flyway")
     implementation("org.flywaydb:flyway-database-postgresql:13.12.2")
 
+    // Service Discovery
+    implementation("io.smallrye.reactive:smallrye-mutiny-vertx-consul-client")
 }
 
 tasks.withType<JavaCompile> {
