@@ -14,6 +14,7 @@ app-books/
 └── src/main/
     ├── java/
     │   ├── com/programacion/distribuida/books/
+    │   │   ├── BooksLifeCycle.java
     │   │   ├── clients/AuthorRestClient.java
     │   │   ├── config/RestClientConfig.java
     │   │   ├── db/Book.java
@@ -86,7 +87,19 @@ AuthorRestClient/mp-rest/url=${app.authors.url}
 
 Para usar otra instancia de autores, definir `APP_AUTHORS_URL` en el entorno de `app-books`. El valor es la URL base del servicio. `AuthorRestClient` añade la ruta `/authors/find/{isbn}`.
 
-La integración actual usa esa URL. El registro de `app-authors` en Consul es opcional para este flujo. [Registro de autores en Consul](../app-authors/README.md#registro-en-consul)
+El cliente REST de autores usa HTTP directo con la URL configurada. El módulo incluye `quarkus-smallrye-stork` como dependencia para descubrimiento y balanceo. [Registro de autores en Consul](../app-authors/README.md#registro-en-consul)
+
+## Registro en Consul
+
+Durante el arranque, `BooksLifeCycle` intenta registrar el servicio `app-books` con el identificador `app-books-127.0.0.1:8080` y anuncia la dirección `127.0.0.1:8080` con la configuración predeterminada. Al detener Quarkus, intenta retirar la instancia si se registró correctamente. El registro está pensado para la práctica local, donde el consumidor puede acceder al servicio por esa dirección. [Código del ciclo de vida](src/main/java/com/programacion/distribuida/books/BooksLifeCycle.java)
+
+El agente Consul se ejecuta por separado del Compose de PostgreSQL y Adminer. La configuración apunta a `127.0.0.1:8500` y admite las variables `CONSUL_HOST` y `CONSUL_PORT`. Si el agente no está disponible, el ciclo de vida de libros escribe el fallo en consola y la aplicación sigue arrancando. El registro requiere un puerto HTTP fijo. [Configuración de MicroProfile](src/main/resources/META-INF/microprofile-config.properties)
+
+Con el agente disponible y `app-books` iniciado, listar sus registros y buscar `app-books`.
+
+```bash
+curl -fsS http://localhost:8500/v1/agent/services
+```
 
 ## Arranque paso a paso
 

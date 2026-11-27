@@ -1,6 +1,6 @@
 # Programación Distribuida
 
-Proyecto Gradle con cinco prácticas. `web01`, `web02` y `web03` se ejecutan de forma independiente. `app-authors` y `app-books` forman el ejemplo integrado de servicios Quarkus con PostgreSQL compartido. [Estado de los módulos](#estado-del-proyecto)
+Proyecto Gradle con seis módulos. `web01`, `web02` y `web03` se ejecutan de forma independiente. `app-authors` y `app-books` forman el ejemplo integrado de servicios Quarkus con PostgreSQL compartido. `app-customers` introduce Spring Boot y el registro automático en Consul. [Estado de los módulos](#estado-del-proyecto)
 
 ## Práctica 1: web01 — REST y despliegue WAR
 
@@ -67,6 +67,8 @@ Servicio con Quarkus, CDI, Jakarta REST, JSON-B y persistencia con Panache. Expo
 
 API de consulta de libros e inventario con Java 25, Jakarta REST, JSON-B y Panache. Expone `GET /books` y `GET /books/{isbn}`. El detalle obtiene los autores por HTTP consultando `GET /authors/find/{isbn}` en `app-authors`. El inventario comparte el ISBN del libro como clave primaria y foránea mediante `@MapsId`. [Guía de app-books](app-books/README.md)
 
+`app-books` intenta registrar su propia instancia en Consul. El cliente de autores sigue usando la URL configurada en `app.authors.url`. [Registro de libros en Consul](app-books/README.md#registro-en-consul)
+
 ### Arrancar autores y libros
 
 Desde la raíz del repositorio, con JDK 25 y Docker Compose, iniciar PostgreSQL y comprobar que acepte conexiones.
@@ -92,6 +94,7 @@ bash gradlew :app-books:quarkusDev -Ddebug=false --console=plain
 | --- | ---: |
 | API de autores | 8070 |
 | API de libros | 8080 |
+| Servidor de clientes | 8090 |
 | PostgreSQL compartido (`books-db`) | 5434 |
 | Adminer de la práctica | 9091 |
 | Consul, si se ejecuta por separado | 8500 |
@@ -111,6 +114,10 @@ Con `quarkus.flyway.migrate-at-start=true` y `quarkus.flyway.baseline-on-migrate
 >
 > `--jvm-args` pasa el puerto HTTP a la JVM de Quarkus. `-Ddebug=false` evita que la segunda instancia intente usar el puerto de depuración predeterminado `5005`. Para depurar la segunda instancia, usar `-Ddebug=5006` en su lugar.
 
+## Práctica 6: app-customers — Spring Boot y Consul
+
+Módulo Spring Boot con Spring MVC y Actuator. Escucha en `8090` y, en el arranque normal, registra el servicio `app-customers` en el agente Consul de `localhost:8500`. Por ahora se puede comprobar el estado del servidor con `GET /actuator/health`. [Guía de app-customers](app-customers/README.md)
+
 ## Estado del proyecto
 
 | Módulo | Estado actual |
@@ -119,12 +126,13 @@ Con `quarkus.flyway.migrate-at-start=true` y `quarkus.flyway.baseline-on-migrate
 | [web02](web02/README.md) | Servicio autónomo con RESTEasy y Undertow. Expone el saludo en `GET /api/hola/{name}` y se ejecuta con Gradle o el lanzador de la distribución. |
 | [web03](web03/README.md) | API Helidon SE de solo lectura. `GET /books` devuelve JSON desde su propia base `web03-db`, cuya tabla de demostración se prepara manualmente. |
 | [app-authors](app-authors/README.md) | API de consulta de autores. Administra el esquema compartido con Flyway hasta `1.0.3` e intenta registrar la instancia en Consul. |
-| [app-books](app-books/README.md) | API de consulta de libros e inventario. Usa `books-db` y la URL de autores configurada. El detalle incluye autores. El listado los consulta por libro y omite el campo en la respuesta. |
+| [app-books](app-books/README.md) | API de consulta de libros e inventario. Usa `books-db`, consulta autores mediante una URL HTTP configurada e intenta registrar su propia instancia en Consul. |
+| [app-customers](app-customers/README.md) | Módulo Spring Boot con Actuator y registro automático en Consul. La API de clientes está pendiente. |
 
 En una prueba previa sobre PostgreSQL 18.6, las tres migraciones reprodujeron el esquema y los datos de los scripts manuales en una base temporal. También se verificó el arranque de `app-authors` sobre una base existente con baseline `1.0.3` y la respuesta HTTP 200 de `GET /authors`.
 
 ## Organización del repositorio
 
-La rama única es `main`. Integra `web01`, `web02`, `web03`, `app-authors` y `app-books`, y conserva el historial de las antiguas ramas `main` y `master` mediante un commit de fusión.
+La rama única es `main`. Integra los seis módulos y conserva el historial de las antiguas ramas `main` y `master` mediante un commit de fusión.
 
 La documentación original de `master` conserva el contexto de publicación de las primeras prácticas. Para la estructura y los comandos actuales, usar este README y los de cada módulo. [Archivo histórico](docs/historial/README-master.md)

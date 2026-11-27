@@ -41,6 +41,13 @@ dependencies {
     // Service Discovery
     implementation("io.smallrye.reactive:smallrye-mutiny-vertx-consul-client")
 
+    // load balancer
+    implementation("io.quarkus:quarkus-smallrye-stork")
+
+    // Service Discovery
+    // para empezar vamos a usar el registro estatico
+
+
 }
 
 tasks.withType<JavaCompile> {
