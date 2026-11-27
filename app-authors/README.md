@@ -1,8 +1,8 @@
-# app-authors — Quarkus y MicroProfile Config
+# app-authors — API de autores, Flyway y Consul
 
 `app-authors` es un módulo del proyecto Gradle `Programacion-Distribuida`. Expone una API de consulta de autores con Jakarta REST y Panache, además de un endpoint de práctica que lee propiedades mediante MicroProfile Config y muestra los resultados en la consola del servidor.
 
-Contiene las entidades `Author`, `BookAuthor` y `BookAuthorId`, el repositorio `AuthorRepository` y el recurso `AuthorRest`. La API ofrece consultas de lectura. El módulo aplica las migraciones de Flyway sobre la base PostgreSQL que comparte con `app-books`.
+Contiene las entidades `Author`, `BookAuthor` y `BookAuthorId`, el repositorio `AuthorRepository` y el recurso `AuthorRest`. La API ofrece consultas de lectura. El módulo aplica las migraciones de Flyway sobre la base PostgreSQL que comparte con `app-books` e intenta registrarse en Consul al arrancar.
 
 ## Puertos y arranque paso a paso
 
@@ -12,19 +12,18 @@ Contiene las entidades `Author`, `BookAuthor` y `BookAuthorId`, el repositorio `
 | API `app-books` | 8080 | Consultas de libros e inventario con Quarkus. |
 | PostgreSQL compartido | 5434 | Docker lo redirige al 5432 del contenedor. |
 | Adminer | 9091 | Docker lo redirige al 8080 del contenedor; no ocupa el 8080 del equipo. |
+| Consul | 8500 | Registro opcional. Se ejecuta por separado del Compose de la práctica. |
 
 Ejecutar desde la raíz `Programacion-Distribuida`:
 
-1. Seleccionar el JDK 25 completo instalado en este equipo:
+1. Seleccionar un JDK 25 completo y comprobar que la terminal lo utilice.
 
    ```bash
-   export JAVA_HOME="$HOME/.jdks/jbr-25.0.4.1"
-   export PATH="$JAVA_HOME/bin:$PATH"
    java -version
    javac -version
    ```
 
-   En otro equipo, usar la ruta de su JDK 25. IntelliJ puede tener un JDK configurado aunque la terminal use un entorno sin compilador.
+   Si estas versiones difieren de las de IntelliJ, ajustar `JAVA_HOME` y `PATH` en la terminal.
 
 2. Iniciar y comprobar PostgreSQL y Adminer:
 
@@ -34,9 +33,7 @@ Ejecutar desde la raíz `Programacion-Distribuida`:
    docker compose -f app-authors/docker-compose.yml exec -T authors pg_isready -U postgres -d books-db
    ```
 
-3. Cuando PostgreSQL acepte conexiones, iniciar el servicio de autores y mantener esta terminal abierta:
-
-   Si la base ya fue preparada con los scripts manuales, consultar cómo incorporarla a Flyway antes de arrancar. [Base inicializada manualmente](#base-inicializada-manualmente)
+3. Cuando PostgreSQL acepte conexiones, iniciar autores con el comando normal si la base está vacía o ya tiene historial de Flyway. Para incorporar una base con tablas creadas manualmente y sin historial, seguir el flujo de baseline. [Base inicializada manualmente](#base-inicializada-manualmente)
 
    ```bash
    bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain
@@ -102,6 +99,7 @@ Las dependencias principales son:
 | `quarkus-jdbc-postgresql` | Driver e integración JDBC para PostgreSQL. |
 | `quarkus-flyway` | Integración de Flyway con el arranque de Quarkus. |
 | `flyway-database-postgresql` | Soporte de PostgreSQL para Flyway. |
+| `smallrye-mutiny-vertx-consul-client` | Cliente de Consul para registrar la instancia de autores. |
 
 Las dependencias se resuelven desde Maven Central. Hibernate mapea las entidades y Flyway administra las tablas mediante los SQL versionados.
 
@@ -117,6 +115,7 @@ app-authors/
 └── src/main/
     ├── java/
     │   ├── com/programacion/distribuida/authors/
+    │   │   ├── AuthorsLifeCycle.java
     │   │   ├── db/{Author,BookAuthor,BookAuthorId}.java
     │   │   ├── repo/AuthorRepository.java
     │   │   └── rest/{AuthorRest,TestConfigRest}.java
@@ -185,10 +184,13 @@ Ambos archivos se cargan como fuentes del mismo sistema de configuración, imple
 El archivo [microprofile-config.properties](src/main/resources/META-INF/microprofile-config.properties) utiliza la ubicación estándar de MicroProfile Config y contiene:
 
 ```properties
-app.name=App Authors
+app.name=app-authors
+app.title=App Authors
+consul.host=127.0.0.1
+consul.port=8500
 ```
 
-Esta propiedad propia de la aplicación alimenta tanto la variable local `appName` como el campo inyectado `diAppName`. `app.title` no está definido en los archivos actuales, aunque puede suministrarse desde otra fuente.
+`app.name` se usa en la lectura de `/config` y como nombre del servicio en Consul. `app.title` es el título que `/config` lee como propiedad opcional y que el módulo define por defecto.
 
 ### `application.properties`
 
@@ -207,7 +209,7 @@ quarkus.datasource.devservices.enabled=false
 quarkus.hibernate-orm.schema-management.strategy=none
 
 quarkus.flyway.migrate-at-start=true
-quarkus.flyway.baseline-on-migrate=true
+quarkus.flyway.baseline-on-migrate=false
 ```
 
 `quarkus.http.port` fija el puerto 8070 y `quarkus.http.host` permite escuchar en todas las interfaces. Las expresiones `${VARIABLE:valor}` permiten sobrescribir la conexión mediante variables de entorno; por defecto apuntan al PostgreSQL del Compose, en `localhost:5434/books-db`. Las credenciales predeterminadas son solo para la práctica local.
@@ -233,6 +235,12 @@ Si una propiedad aparece en varias fuentes, prevalece la de mayor ordinal. Las p
 
 Así, `application.properties` gana frente a `microprofile-config.properties` si ambos definen `app.name`. Una variable de entorno `APP_NAME` puede sobrescribir a ambos. El listado que imprime el endpoint permite observar las fuentes realmente disponibles, que pueden incluir otras añadidas por Quarkus. Véase la [referencia de configuración](https://quarkus.io/guides/config-reference/#config-sources).
 
+## Registro en Consul
+
+Al arrancar, `AuthorsLifeCycle` intenta registrar el servicio con el nombre `app-authors` y la dirección anunciada `127.0.0.1:8070` en la configuración predeterminada. Al detener Quarkus, intenta retirar el registro de la instancia. Se puede cambiar la conexión al agente con `CONSUL_HOST` y `CONSUL_PORT`. [Código del ciclo de vida](src/main/java/com/programacion/distribuida/authors/AuthorsLifeCycle.java)
+
+Si el agente de Consul no está disponible, el servicio escribe el error de registro en consola y la API sigue arrancando. `app-books` sigue consultando autores mediante la URL configurada en `app.authors.url`. [Configuración del cliente de libros](../app-books/README.md#configuración)
+
 ## PostgreSQL y variables de entorno
 
 Docker Compose levanta PostgreSQL. Al inicializar un directorio de datos vacío, el contenedor crea la base `books-db`. Al arrancar, `app-authors` conecta a esa base y Flyway valida y aplica las migraciones pendientes.
@@ -249,10 +257,12 @@ Flyway busca los archivos `V<versión>__<descripción>.sql` en `src/main/resourc
 | [`1.0.2`](src/main/resources/db/migration/V1.0.2__crear-tabla-libros.sql) | Crea `books` y `books_authors`, carga cinco libros y doce relaciones. |
 | [`1.0.3`](src/main/resources/db/migration/V1.0.3__crear-tablas-inventory.sql) | Crea `inventory` con sus restricciones y carga el inventario de *Effective Java*. |
 
-`migrate-at-start=true` aplica las versiones pendientes al ejecutar `quarkusDev` o al arrancar el JAR empaquetado. `quarkusBuild` prepara el paquete. En este flujo se omiten los antiguos scripts de inicialización manual. Flyway registra las migraciones aplicadas en `public.flyway_schema_history` de cada base, con el nombre del archivo, su *checksum* y el resultado. Consultar la tabla desde Adminer o `psql`:
+`migrate-at-start=true` aplica las versiones pendientes al ejecutar `quarkusDev` o al arrancar el JAR empaquetado. `quarkusBuild` prepara el paquete. En una base nueva y vacía, Flyway crea las tablas y carga los datos de ejemplo desde `1.0.1`. Docker Compose solo tiene que inicializar la base `books-db`.
+
+Flyway registra el punto de partida, si se definió uno, y las migraciones ejecutadas en `public.flyway_schema_history`. La columna `type` distingue las filas `BASELINE` de las migraciones `SQL`. Consultar el historial desde Adminer o `psql` después del primer arranque.
 
 ```sql
-SELECT version, script, checksum, installed_on, success
+SELECT version, type, script, checksum, installed_on, success
 FROM public.flyway_schema_history
 ORDER BY installed_rank;
 ```
@@ -263,21 +273,27 @@ Para cambiar una tabla, crear un archivo con una versión posterior. Por ejemplo
 ALTER TABLE public.authors ADD COLUMN email varchar(255);
 ```
 
-En una base al día hasta `1.0.3`, el próximo arranque solo ejecutaría `1.0.4`. Una base nueva ejecutaría las cuatro versiones en orden. Si se modifica el contenido de un archivo ya aplicado y cambia su *checksum*, Flyway detiene el arranque con un error de validación. Restaurar el contenido aplicado y trasladar el cambio al archivo nuevo. Las migraciones pueden incluir cambios de esquema y datos de referencia explícitos en SQL. Los datos agregados durante el uso de la aplicación permanecen en su propia base.
+**Si el historial ya está al día hasta `1.0.3`, incluso si tiene un `BASELINE` en esa versión, mantener `quarkus.flyway.baseline-on-migrate=false` y `quarkus.flyway.migrate-at-start=true`.** Al arrancar, Flyway ejecutará `1.0.4` si está pendiente. Si ya está aplicada, continuará sin volver a ejecutarla. Una base nueva ejecutaría las cuatro versiones en orden. `1.0.4` es un ejemplo. El repositorio incluye migraciones hasta `1.0.3`.
+
+Si se modifica el contenido de un archivo ya aplicado y cambia su *checksum*, Flyway detiene el arranque con un error de validación. Restaurar el contenido original y trasladar el cambio al archivo nuevo.
 
 ### Base inicializada manualmente
 
-Con `baseline-on-migrate=true`, una base con tablas y sin historial se marca con una versión de partida. Flyway omite las migraciones hasta esa versión inclusive. El valor predeterminado es `1`, así que usarlo con las tablas de esta práctica ya creadas haría que Flyway intentara ejecutar `1.0.1` y chocara con `authors`.
+El baseline es una marca que indica hasta qué versión ya está preparada una base existente. Flyway omite las migraciones hasta esa versión inclusive. Usar este flujo una sola vez para incorporar una base con tablas creadas manualmente y sin `public.flyway_schema_history`.
 
-Antes de adoptar esa base, comprobar qué migraciones representan su esquema y su carga inicial. Si ya corresponden a las tres versiones, usar `1.0.3` como punto de partida. Si solo corresponden a autores, libros y relaciones y falta inventario, usar `1.0.2` para que Flyway aplique `1.0.3`. Si el estado es parcial, revisar las diferencias antes de fijar el punto de partida. [Referencias SQL de autores y libros](../docs/sql-autores-libros.md) · [Inventario](../docs/sql-inventario-libros.md)
+1. Verificar el esquema, las restricciones y los datos de referencia. Si coinciden con las tres migraciones, elegir `1.0.3`. Si coinciden hasta autores, libros y relaciones y falta inventario, elegir `1.0.2` para que Flyway aplique `1.0.3`. Revisar cualquier diferencia antes de fijar la versión. [Autores, libros y relaciones](../docs/sql-autores-libros.md) · [Inventario](../docs/sql-inventario-libros.md)
+2. En el primer arranque, activar `quarkus.flyway.baseline-on-migrate` y fijar `quarkus.flyway.baseline-version`. Para dejar la configuración del repositorio como está, pasar los valores mediante variables de entorno. Este ejemplo usa `1.0.3`.
 
-Ejemplo de primer arranque para una base equivalente a `1.0.3` sin historial:
+   ```bash
+   QUARKUS_FLYWAY_BASELINE_ON_MIGRATE=true \
+   QUARKUS_FLYWAY_BASELINE_VERSION=1.0.3 \
+     bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain
+   ```
 
-```bash
-QUARKUS_FLYWAY_BASELINE_VERSION=1.0.3 bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain
-```
+   Si ya existe un archivo `V1.0.4__*.sql` en el proyecto, Flyway registra el baseline en `1.0.3` y ejecuta `1.0.4` en ese mismo arranque.
+3. Consultar el historial y comprobar que la fila `BASELINE` tiene la versión elegida y `success=true`. Volver a arrancar con el comando normal, sin esas variables. Con `baseline-on-migrate=false` y `migrate-at-start=true`, Flyway usa el historial y aplica las versiones pendientes.
 
-Para los siguientes arranques, Flyway usa el historial que ya existe en la base. [Guía de Flyway en Quarkus](https://quarkus.io/guides/flyway/) · [Configuración de `baselineOnMigrate`](https://documentation.red-gate.com/flyway/reference/configuration/flyway-namespace/flyway-baseline-on-migrate-setting)
+La versión predeterminada de un nuevo baseline es `1`. Si la base ya tiene `authors`, usar ese valor hace que Flyway intente ejecutar `1.0.1` y PostgreSQL devuelva `relation "authors" already exists`. Si el historial ya contiene ese baseline incorrecto, cambiar `quarkus.flyway.baseline-version` no modifica la fila registrada. Verificar el esquema y los datos antes de corregir el punto de partida existente. [Guía de Flyway en Quarkus](https://quarkus.io/guides/flyway/) · [Configuración de `baselineOnMigrate`](https://documentation.red-gate.com/flyway/reference/configuration/flyway-namespace/flyway-baseline-on-migrate-setting)
 
 ## Ejecutar y comprobar el comportamiento
 
@@ -300,11 +316,11 @@ curl -i http://localhost:8070/config
 El cuerpo estará vacío. En la consola del servidor, además del listado de fuentes y los separadores, se espera esta salida si no hay sobrescrituras externas:
 
 ```text
-app.name = App Authors
-app.name = App Authors
+app.name = app-authors
+app.name = app-authors
 Port = 8070
-App Name = App Authors
-app.title = <no definido>
+App Name = app-authors
+app.title = App Authors
 ```
 
 Para comprobar las sobrescrituras y el título opcional, detener el servidor y reiniciarlo con:

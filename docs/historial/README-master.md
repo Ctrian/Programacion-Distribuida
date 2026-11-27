@@ -1,12 +1,14 @@
 # Programación Distribuida — Laboratorios Java
 
+Este documento conserva el estado de la rama `master` en el momento de la publicación de las primeras prácticas. Las instrucciones vigentes y el estado de los cinco módulos están en el README general. [Documentación actual](../../README.md#estado-del-proyecto)
+
 Tres prácticas que muestran la evolución del despliegue y la comunicación entre procesos:
 
 | Módulo | Modelo | Comunicación |
 | --- | --- | --- |
-| [web01](web01/README.md) | WAR en un servidor externo | Cliente → HTTP → recurso REST |
-| [web02](web02/README.md) | RESTEasy y Undertow embebido | Cliente → HTTP → aplicación autónoma |
-| [web03](web03/README.md) | Helidon SE y PostgreSQL en Docker | Cliente → HTTP → aplicación → JDBC → base de datos |
+| [web01](../../web01/README.md) | WAR en un servidor externo | Cliente → HTTP → recurso REST |
+| [web02](../../web02/README.md) | RESTEasy y Undertow embebido | Cliente → HTTP → aplicación autónoma |
+| [web03](../../web03/README.md) | Helidon SE y PostgreSQL en Docker | Cliente → HTTP → aplicación → JDBC → base de datos |
 
 Los módulos comparten el wrapper y la configuración de un proyecto Gradle. Debe abrirse esta carpeta como proyecto en IntelliJ IDEA. Cada README describe el estado real de su práctica y los ajustes pendientes; no se presupone que las tres se ejecuten simultáneamente, porque utilizan el puerto 8080.
 

@@ -2,6 +2,8 @@
 
 Tercera práctica: una aplicación Java inicia su servidor HTTP y consulta una base de datos que se ejecuta en otro proceso, dentro de un contenedor Docker.
 
+El módulo usa su propia base, `web03-db`. El endpoint `GET /books` devuelve los registros como JSON y la tabla de demostración se prepara con el SQL de esta guía. [Estado de los módulos](../README.md#estado-del-proyecto)
+
 ## Arquitectura
 
 ```text
@@ -28,7 +30,7 @@ Helidon 4 requiere Java 21 o superior. Además, el archivo de ejemplo `org/examp
 
 ## Preparar PostgreSQL
 
-Con Docker y Docker Compose disponibles, ejecutar desde `laboratorio/`:
+Con Docker y Docker Compose disponibles, ejecutar desde la raíz de `Programacion-Distribuida`.
 
 ```bash
 docker compose -f web03/docker-compose.yml up -d
@@ -41,7 +43,7 @@ Esperar a que PostgreSQL acepte conexiones:
 docker compose -f web03/docker-compose.yml exec web03 pg_isready -U postgres -d web03-db
 ```
 
-El código consulta las columnas `name` y `title` de `books`. En la práctica ya se creó la tabla y se insertaron datos de prueba mediante la interfaz web, según lo confirmado por el usuario. No hace falta recrear una base ya preparada. Para una base nueva, se puede preparar una tabla mínima de demostración:
+El código consulta las columnas `name` y `title` de `books`. Si `web03-db` está vacía, ejecutar este bloque para preparar la tabla e insertar una fila de demostración.
 
 ```bash
 docker compose -f web03/docker-compose.yml exec -T web03 psql -U postgres -d web03-db <<'SQL'
@@ -53,13 +55,11 @@ INSERT INTO books (name, title) VALUES ('Miguel de Cervantes', 'Don Quijote');
 SQL
 ```
 
-Cada ejecución del `INSERT` añade una fila. Se propone este esquema por las columnas que lee el código; no representa una migración existente del proyecto.
+Cada ejecución del `INSERT` añade una fila. Para una base ya preparada, continuar con el arranque de Java.
 
 ### Datos de prueba y reproducibilidad
 
-Los datos insertados mediante Adminer son registros reales de prueba en PostgreSQL; no son una base simulada dentro de Java. Son suficientes para la demostración local. Lo que todavía no está incluido en el repositorio es el procedimiento automatizado que permite reconstruir esa base en otro equipo.
-
-Sí se puede ejecutar `CREATE TABLE` e `INSERT` desde el `main`, usando `DbClient` antes de arrancar el servidor, pero no es necesario para consultar las tablas que ya existen. Además, un `INSERT` incondicional añadiría los mismos ejemplos en cada arranque. Para este laboratorio puede conservarse el SQL de demostración documentado; como siguiente mejora, se puede guardarlo en un archivo de inicialización o una migración. No se añadieron escrituras automáticas al arranque ni se modificaron los datos existentes.
+La carga de prueba se puede hacer con el comando anterior o en Adminer. El arranque de Java usa la tabla existente y la preparación de datos sigue siendo manual.
 
 Adminer queda en `http://localhost:9090`. Elegir PostgreSQL y usar:
 
@@ -76,7 +76,7 @@ Las credenciales incluidas son valores de práctica local. Compose no fija una v
 
 ## Ejecutar la aplicación
 
-En IntelliJ IDEA, abrir `laboratorio/`, sincronizar Gradle y ejecutar el `main` de `com.programacion.distribuida.Web03Main`. PostgreSQL debe estar disponible y el puerto 8080 libre.
+En IntelliJ IDEA, abrir la raíz del repositorio, sincronizar Gradle y ejecutar el `main` de `com.programacion.distribuida.Web03Main`. PostgreSQL debe estar disponible y el puerto 8080 libre.
 
 ```bash
 curl -i --max-time 10 http://localhost:8080/books
@@ -102,7 +102,7 @@ El manifiesto ya declara la clase existente `com.programacion.distribuida.Web03M
 
 La corrección sustituyó `org.example.web03.Application`, que no existe en los fuentes, por la clase que contiene el `main` del servidor. `java -jar` consulta `META-INF/MANIFEST.MF` para saber qué clase ejecutar: el nombre correcto debe figurar allí y su archivo `.class` debe estar incluido en el JAR. No se cambió el paquete de `Web03Main`. La modificación posterior de `/books` para devolver JSON se describe en la sección de ejecución.
 
-Desde `laboratorio/`, con un JDK 25 completo seleccionado:
+Desde la raíz del repositorio, con un JDK 25 completo seleccionado.
 
 ```bash
 bash gradlew :web03:shadowJar

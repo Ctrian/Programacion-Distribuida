@@ -1,5 +1,7 @@
 # Programación Distribuida
 
+Proyecto Gradle con cinco prácticas. `web01`, `web02` y `web03` se ejecutan de forma independiente. `app-authors` y `app-books` forman el ejemplo integrado de servicios Quarkus con PostgreSQL compartido. [Estado de los módulos](#estado-del-proyecto)
+
 ## Práctica 1: web01 — REST y despliegue WAR
 
 Aplicación Java que expone un saludo por HTTP mediante Jakarta REST y se empaqueta con Gradle como WAR para desplegarse en un servidor externo.
@@ -18,7 +20,7 @@ Consultar [la documentación de web02](web02/README.md) para entender la arquite
 
 ## Compilar y ejecutar
 
-Desde esta carpeta, con un JDK completo compatible con Gradle 9.8.2:
+Ejecutar los comandos desde la raíz del repositorio con un **JDK 25 completo**. Comprobar que `java -version` y `javac -version` correspondan al mismo JDK. El wrapper usa Gradle `9.8.2`.
 
 ```bash
 bash gradlew :web01:war
@@ -45,12 +47,12 @@ Comprobar desde otra terminal:
 curl -i http://localhost:8080/api/hola/Ana
 ```
 
-Se espera estado `200` y el texto `hola Ana - ...`. `web01` y `web02` utilizan el puerto 8080 en las configuraciones de ejemplo; ejecutar una práctica a la vez o configurar puertos distintos. Detener `web02` con `Ctrl+C` si se arrancó desde terminal.
+Se espera estado `200` y el texto `hola Ana - ...`. `web01`, `web02`, `web03` y `app-books` usan el puerto 8080 en las configuraciones de ejemplo. Ejecutarlos por separado o asignarles puertos distintos. Detener `web02` con `Ctrl+C` si se arrancó desde terminal.
 
 ## Práctica 3: web03 — Helidon y PostgreSQL
 
 API de libros con Helidon SE, respuesta JSON y acceso JDBC a PostgreSQL.
-Incluye PostgreSQL y Adminer mediante Docker Compose.
+Su Compose inicia PostgreSQL para `web03-db` en el puerto 5433 y Adminer en 9090. Para una base nueva, la guía incluye el SQL de demostración.
 
 Consultar [la documentación de web03](web03/README.md).
 
@@ -59,7 +61,7 @@ Consultar [la documentación de web03](web03/README.md).
 
 Servicio con Quarkus, CDI, Jakarta REST, JSON-B y persistencia con Panache. Expone `GET /authors`, `GET /authors/{id}` y `GET /authors/find/{isbn}` para consultar autores. Conserva `GET /config` como ejemplo de MicroProfile Config: devuelve un cuerpo vacío y escribe los valores en consola.
 
-`app-authors` aplica con Flyway las migraciones de la base compartida al arrancar. La guía explica cómo consultar el historial, incorporar cambios y adoptar una base inicializada manualmente. [Guía de app-authors](app-authors/README.md#migraciones-de-la-base-compartida)
+`app-authors` aplica con Flyway las migraciones de la base compartida al arrancar. También intenta registrar su instancia en Consul, que se ejecuta por separado y es opcional para usar la API. [Migraciones](app-authors/README.md#migraciones-de-la-base-compartida) · [Registro en Consul](app-authors/README.md#registro-en-consul)
 
 ## Práctica 5: app-books — libros e inventario con Quarkus
 
@@ -74,7 +76,7 @@ docker compose -f app-authors/docker-compose.yml up -d
 docker compose -f app-authors/docker-compose.yml exec -T authors pg_isready -U postgres -d books-db
 ```
 
-Iniciar `app-authors` para que Flyway prepare `books-db`. Si la base ya incluye tablas creadas manualmente, comprobar su versión de partida antes de arrancar. [Base inicializada manualmente](app-authors/README.md#base-inicializada-manualmente)
+Con una base nueva o una base que ya tenga historial de Flyway, iniciar `app-authors` con el comando normal. Si la base tiene tablas creadas manualmente y carece de historial, primero verificar su estado y seguir el flujo de baseline. [Base inicializada manualmente](app-authors/README.md#base-inicializada-manualmente)
 
 ```bash
 bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain
@@ -92,17 +94,37 @@ bash gradlew :app-books:quarkusDev -Ddebug=false --console=plain
 | API de libros | 8080 |
 | PostgreSQL compartido (`books-db`) | 5434 |
 | Adminer de la práctica | 9091 |
+| Consul, si se ejecuta por separado | 8500 |
 
-Para una base nueva, el arranque de `app-authors` basta para cargar las tablas y los datos de ejemplo. El diseño de las tablas y las consultas de comprobación están en las referencias de [autores y libros](docs/sql-autores-libros.md) e [inventario](docs/sql-inventario-libros.md).
+Con `quarkus.flyway.migrate-at-start=true` y `quarkus.flyway.baseline-on-migrate=false`, Flyway crea las tablas y carga los datos de ejemplo en una base vacía. En una base con historial, aplica las versiones pendientes. Por ejemplo, si ya figura `1.0.3` en el historial y se añade una migración `1.0.4`, el arranque normal aplica `1.0.4` una sola vez. El baseline automático se activa para el primer arranque de una base preparada manualmente y sin historial, con la versión de partida indicada explícitamente. [Flujo de Flyway](app-authors/README.md#migraciones-de-la-base-compartida) · [SQL de autores y libros](docs/sql-autores-libros.md) · [SQL de inventario](docs/sql-inventario-libros.md)
+
+> **Segunda instancia de `app-authors` en IntelliJ IDEA**
+>
+> 1. Abrir **Run → Edit Configurations…**, duplicar la configuración Gradle de `:app-authors:quarkusDev` y nombrar la copia `app-authors 8071`.
+> 2. Pegar esta línea en el campo **Run** o **Tasks and Arguments**.
+>
+>    ```text
+>    :app-authors:quarkusDev --jvm-args=-Dquarkus.http.port=8071 -Ddebug=false
+>    ```
+>
+> 3. Guardar con **Apply → OK**, iniciar la copia con **Run** y comprobar que responde en `http://localhost:8071/authors` mientras la primera instancia sigue en `8070`.
+>
+> `--jvm-args` pasa el puerto HTTP a la JVM de Quarkus. `-Ddebug=false` evita que la segunda instancia intente usar el puerto de depuración predeterminado `5005`. Para depurar la segunda instancia, usar `-Ddebug=5006` en su lugar.
 
 ## Estado del proyecto
 
-- `web01`, `web02` y `web03` se pueden ejecutar como prácticas independientes.
-- `app-authors` y `app-books` comparten PostgreSQL. El esquema y la carga inicial están versionados en Flyway hasta `1.0.3`. En una base temporal con PostgreSQL 18.6 se verificó que las tres migraciones reproducen el esquema y los datos de los scripts manuales y que una segunda ejecución omite las versiones aplicadas.
-- `app-books` devuelve los autores en `GET /books/{isbn}`. El listado `GET /books` consulta el servicio de autores por cada libro y aún omite los autores en la respuesta. Las dos API ofrecen consultas de lectura.
+| Módulo | Estado actual |
+| --- | --- |
+| [web01](web01/README.md) | WAR con página estática y saludo Jakarta REST. El endpoint requiere un servidor externo que proporcione una implementación compatible. |
+| [web02](web02/README.md) | Servicio autónomo con RESTEasy y Undertow. Expone el saludo en `GET /api/hola/{name}` y se ejecuta con Gradle o el lanzador de la distribución. |
+| [web03](web03/README.md) | API Helidon SE de solo lectura. `GET /books` devuelve JSON desde su propia base `web03-db`, cuya tabla de demostración se prepara manualmente. |
+| [app-authors](app-authors/README.md) | API de consulta de autores. Administra el esquema compartido con Flyway hasta `1.0.3` e intenta registrar la instancia en Consul. |
+| [app-books](app-books/README.md) | API de consulta de libros e inventario. Usa `books-db` y la URL de autores configurada. El detalle incluye autores. El listado los consulta por libro y omite el campo en la respuesta. |
+
+En una prueba previa sobre PostgreSQL 18.6, las tres migraciones reprodujeron el esquema y los datos de los scripts manuales en una base temporal. También se verificó el arranque de `app-authors` sobre una base existente con baseline `1.0.3` y la respuesta HTTP 200 de `GET /authors`.
 
 ## Organización del repositorio
 
 La rama única es `main`. Integra `web01`, `web02`, `web03`, `app-authors` y `app-books`, y conserva el historial de las antiguas ramas `main` y `master` mediante un commit de fusión.
 
-La [documentación original de master](docs/historial/README-master.md) se conserva como referencia histórica de las prácticas y su publicación. Describe el estado del equipo y del repositorio en revisiones anteriores; para la estructura y los comandos actuales, utilizar este README y los de cada módulo. Sus rutas relativas corresponden a su ubicación original en la raíz.
+La documentación original de `master` conserva el contexto de publicación de las primeras prácticas. Para la estructura y los comandos actuales, usar este README y los de cada módulo. [Archivo histórico](docs/historial/README-master.md)

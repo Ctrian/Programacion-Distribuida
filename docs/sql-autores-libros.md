@@ -2,7 +2,7 @@
 
 Flyway crea y carga estas tablas al arrancar `app-authors`. `V1.0.1` prepara `authors`, y `V1.0.2` añade `books` y `books_authors`. [Migración de autores](../app-authors/src/main/resources/db/migration/V1.0.1__crear-tablas-autores.sql) · [Migración de libros y relaciones](../app-authors/src/main/resources/db/migration/V1.0.2__crear-tabla-libros.sql) · [Guía de migraciones](../app-authors/README.md#migraciones-de-la-base-compartida)
 
-El SQL original y la inicialización manual se conservan como referencia para comparar el esquema y entender las correcciones. La carga de referencia está en [app-authors/sql/init.sql](../app-authors/sql/init.sql).
+El SQL original y el script manual sirven para comparar el esquema y los datos. Si `books-db` está vacía, dejar que Flyway cree las tablas al arrancar. Para incorporar una base sin historial, si ya contiene el esquema y los datos de autores, libros y relaciones pero falta inventario, el punto de partida es `1.0.2`. Flyway aplicará `1.0.3`. [Script manual de referencia](../app-authors/sql/init.sql) · [Flujo de baseline](../app-authors/README.md#base-inicializada-manualmente)
 
 ## SQL original recibido
 

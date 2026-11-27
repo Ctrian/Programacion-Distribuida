@@ -2,7 +2,7 @@
 
 Flyway crea y carga `inventory` al arrancar `app-authors`. La versión `1.0.3` depende de `1.0.2`, que crea `books` y carga el ISBN de ejemplo. [Migración de inventario](../app-authors/src/main/resources/db/migration/V1.0.3__crear-tablas-inventory.sql) · [Guía de migraciones](../app-authors/README.md#migraciones-de-la-base-compartida)
 
-El documento conserva el SQL original, explica las restricciones y muestra cómo comprobar la carga. El [script de inicialización manual](../app-books/sql/init-inventory.sql) queda como referencia junto con el [SQL de autores y libros](sql-autores-libros.md).
+El documento conserva el SQL original, explica las restricciones y muestra cómo comprobar la carga. Si una base sin historial ya contiene el esquema y los datos de referencia de autores, libros, relaciones e inventario, verificar su equivalencia con `1.0.3` antes de registrarla con ese baseline. [Script manual de referencia](../app-books/sql/init-inventory.sql) · [SQL de autores y libros](sql-autores-libros.md) · [Flujo de baseline](../app-authors/README.md#base-inicializada-manualmente)
 
 ## SQL original recibido
 

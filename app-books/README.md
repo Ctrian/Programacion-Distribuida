@@ -86,20 +86,20 @@ AuthorRestClient/mp-rest/url=${app.authors.url}
 
 Para usar otra instancia de autores, definir `APP_AUTHORS_URL` en el entorno de `app-books`. El valor es la URL base del servicio. `AuthorRestClient` añade la ruta `/authors/find/{isbn}`.
 
+La integración actual usa esa URL. El registro de `app-authors` en Consul es opcional para este flujo. [Registro de autores en Consul](../app-authors/README.md#registro-en-consul)
+
 ## Arranque paso a paso
 
 Ejecutar los comandos desde la raíz del repositorio `Programacion-Distribuida`.
 
-1. Seleccionar un JDK 25 completo. En el equipo de esta práctica:
+1. Seleccionar un JDK 25 completo y comprobar las versiones de la terminal.
 
    ```bash
-   export JAVA_HOME="$HOME/.jdks/jbr-25.0.4.1"
-   export PATH="$JAVA_HOME/bin:$PATH"
    java -version
    javac -version
    ```
 
-   En otro equipo, sustituir la ruta por la de su JDK. Tener `java` disponible sin `javac` no basta para compilar.
+   Si hace falta seleccionar otro JDK, ajustar `JAVA_HOME` y `PATH`.
 
 2. Levantar PostgreSQL y Adminer:
 
@@ -113,7 +113,7 @@ Ejecutar los comandos desde la raíz del repositorio `Programacion-Distribuida`.
 
 3. Iniciar autores para que Flyway prepare la base compartida y para que el cliente HTTP tenga un servicio disponible.
 
-   Si la base ya fue preparada con los scripts manuales, revisar su versión de partida antes de arrancar. [Base inicializada manualmente](../app-authors/README.md#base-inicializada-manualmente)
+   En una base vacía, Flyway aplica todas las migraciones; con historial ya registrado, aplica las pendientes. En ambos casos se usa el comando normal y el baseline automático queda desactivado. Para incorporar una base preparada a mano y sin historial, configurar el baseline en el primer arranque de `app-authors`. [Base inicializada manualmente](../app-authors/README.md#base-inicializada-manualmente)
 
    ```bash
    bash gradlew :app-authors:quarkusDev -Ddebug=false --console=plain

@@ -2,6 +2,8 @@
 
 Primera práctica: separar la aplicación del servidor que la ejecuta. Gradle genera un archivo `.war` que se despliega en un servidor externo.
 
+El módulo se ejecuta de forma independiente. Con un servidor compatible con Jakarta REST, la página estática y el saludo quedan disponibles bajo el contexto del WAR. [Estado de los módulos](../README.md#estado-del-proyecto)
+
 ## Qué contiene
 
 - `MiAplicacionRest`: establece `/api` como base de la API con `@ApplicationPath`.
@@ -21,7 +23,7 @@ En el entorno local hay Tomcat 9 y TomEE 11 WebProfile. **Este código usa `jaka
 
 ## Compilación y despliegue
 
-Abrir la raíz del proyecto Gradle en IntelliJ IDEA: `laboratorio/` en el entorno local o la carpeta del repositorio tras clonarlo. Todos los comandos de esta sección se ejecutan desde esa raíz, donde están `gradlew` y `settings.gradle.kts`:
+Abrir la raíz de `Programacion-Distribuida` en IntelliJ IDEA. Ejecutar los comandos desde la carpeta que contiene `gradlew` y `settings.gradle.kts`, con un JDK 25 completo.
 
 ```bash
 bash gradlew :web01:war

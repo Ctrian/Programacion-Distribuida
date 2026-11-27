@@ -2,7 +2,7 @@
 
 Segunda práctica: la propia aplicación arranca el servidor HTTP desde un método `main`, en lugar de desplegar un WAR en un servidor externo.
 
-Los comandos se ejecutan desde la raíz Gradle, donde están `gradlew` y `settings.gradle.kts`: `laboratorio/` en el entorno original o la carpeta del repositorio clonado. Las referencias a `laboratorio/` en los pasos siguientes indican esa raíz.
+El módulo ejecuta de forma independiente el saludo `GET /api/hola/{name}` en el puerto 8080. Ejecutar los comandos desde la raíz de `Programacion-Distribuida`, donde están `gradlew` y `settings.gradle.kts`. [Estado de los módulos](../README.md#estado-del-proyecto)
 
 ## Responsabilidad de cada pieza
 
@@ -27,7 +27,7 @@ Cliente <-- texto de respuesta <-------------+
 
 ## Ejecución en IntelliJ IDEA
 
-1. Abrir `laboratorio/` y sincronizar el proyecto Gradle.
+1. Abrir la raíz del repositorio y sincronizar el proyecto Gradle.
 2. Configurar un JDK compatible con las dependencias declaradas.
 3. Abrir `Web02Main.java` y ejecutar `com.programacion.distribuida.web02.Web02Main` con el botón junto a `main`.
 4. Probar desde una terminal:
@@ -66,7 +66,7 @@ application {
 }
 ```
 
-Desde `laboratorio/`, iniciar la aplicación con:
+Iniciar la aplicación desde la raíz del repositorio.
 
 ```bash
 bash gradlew :web02:run
@@ -74,7 +74,7 @@ bash gradlew :web02:run
 
 ### Ejecutar el lanzador generado en build/
 
-Esta es una alternativa a `:web02:run`: Gradle prepara la distribución y después se ejecuta un script que arranca Java directamente. Primero, desde `laboratorio/`, generar los archivos:
+Esta es una alternativa a `:web02:run`. Gradle prepara la distribución y después se ejecuta el lanzador. Generar los archivos desde la raíz del repositorio.
 
 ```bash
 bash gradlew :web02:installDist
@@ -99,7 +99,7 @@ cd web02/build/install/web02/bin
 ./web02
 ```
 
-También puede ejecutarse desde `laboratorio/` sin cambiar de directorio:
+También se puede ejecutar el lanzador desde la raíz del repositorio.
 
 ```bash
 ./web02/build/install/web02/bin/web02
@@ -125,24 +125,15 @@ En IntelliJ también pueden ejecutarse las tareas `run` e `installDist` del mód
 
 La terminal y el IDE pueden utilizar instalaciones de Java diferentes. Si Gradle informa que Java no proporciona `JAVA_COMPILER`, comprobar que se está utilizando un JDK completo, con `bin/javac`, y no solamente un entorno de ejecución.
 
-En el equipo revisado, la compilación se verificó con el JDK de IntelliJ ubicado en `/home/oli/.jdks/jbr-25.0.4.1`:
+Para compilar desde este repositorio, comprobar que la terminal use un JDK 25 completo. En IntelliJ, seleccionar ese JDK como **Gradle JVM**.
 
 ```bash
-JAVA_HOME=/home/oli/.jdks/jbr-25.0.4.1 bash gradlew :web02:installDist --offline --console=plain
-```
-
-Esta ruta es local: en otro equipo se debe sustituir por la de su JDK. `--offline` utiliza las dependencias de la caché; omitirlo si todavía deben descargarse. En IntelliJ, seleccionar un JDK completo como **Gradle JVM** en la configuración de Gradle.
-
-Para seleccionar ese JDK durante toda la sesión de terminal, en vez de repetirlo en cada comando:
-
-```bash
-export JAVA_HOME=/home/oli/.jdks/jbr-25.0.4.1
-export PATH="$JAVA_HOME/bin:$PATH"
 java -version
 javac -version
+bash gradlew :web02:installDist --console=plain
 ```
 
-Ejecutar los comandos Gradle o el lanzador en esa misma terminal. Una asignación como `JAVA_HOME=... bash gradlew ...` solo se aplica a ese comando y no cambia el Java de un lanzador ejecutado después.
+Si la terminal selecciona otro JDK, ajustar `JAVA_HOME` y `PATH` y ejecutar Gradle y el lanzador en esa misma terminal.
 
 **Verificación realizada:** `:web02:installDist` terminó correctamente y generó el JAR, los scripts y la distribución. No se arrancó el servidor ni se comprobó el endpoint HTTP en esta verificación.
 
